@@ -1,11 +1,19 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="2D Runner (Streamlit)", layout="centered")
-st.title("Simple 2D Endless Runner — Streamlit")
+st.set_page_config(page_title="Blue Bob's Tiny Adventure", layout="centered")
+st.title("Blue Bob's Tiny Adventure")
+
+# Credits directly after the title
+st.markdown("""
+**Credits:**  
+Created by: **Fire10dino** (player/idea) & **ChatGPT** (code helper)  
+Built with: **Streamlit** + **HTML5 Canvas & JavaScript**  
+Special thanks to: The **open-source community** behind Streamlit and JS game dev!
+""")
 
 st.markdown("""
-A tiny 2D endless runner implemented in plain HTML5 canvas + JavaScript embedded into Streamlit.
+A tiny 2D endless runner implemented in plain HTML5 canvas + JavaScript embedded into Streamlit.  
 Controls:
 - Space / Up arrow / Tap = jump
 - Click "Restart" button below the game to restart
@@ -30,7 +38,7 @@ HTML = f'''
   <body>
     <canvas id="game" width="700" height="{height}"></canvas>
     <div class="overlay">
-      <div id="score">Green Cube Score: 0 | Red Cubes Passed: 0</div>
+      <div id="score">Green Score: 0 | Red Score: 0</div>
       <button id="restart">Restart</button>
       <div style="font-size:12px; color:#666; margin-top:6px;">Difficulty: {difficulty}</div>
     </div>
@@ -41,10 +49,12 @@ HTML = f'''
       const ctx = canvas.getContext('2d');
       const W = canvas.width; const H = canvas.height;
 
+      // Parameters
       const difficulty = {difficulty};
       const jumpStrength = -16;
       const groundY = H - 30;
 
+      // Game state
       let player = {{ x:80, y:H - 80, w:36, h:48, vy:0, grounded:false }};
       const gravity = 0.9;
 
@@ -53,7 +63,7 @@ HTML = f'''
       let speed = 4 + (difficulty - 1) * 1.5;
 
       let greenScore = 0;
-      let redPassed = 0;
+      let redScore = 0;
       let alive = true;
 
       function reset(){{
@@ -62,47 +72,51 @@ HTML = f'''
         obstacles = [];
         spawnTimer = 0;
         greenScore = 0;
-        redPassed = 0;
+        redScore = 0;
         alive = true;
         speed = 4 + (difficulty - 1) * 1.5;
-        document.getElementById('score').innerText = 'Green Cube Score: 0 | Red Cubes Passed: 0';
+        document.getElementById('score').innerText = 'Green Score: 0 | Red Score: 0';
       }}
 
       function spawnObstacle(){{
         const h = 24 + Math.random()*48;
-        let type = 'red';
-        if (Math.random() < 1/7) type = 'green';
-        obstacles.push({{ x: W + 20, y: groundY - h, w: 18 + Math.random()*26, h: h, type: type, counted: false }});
+        const isGreen = Math.random() < (1/7); // 1 in 7 chance for green
+        obstacles.push({{ 
+          x: W + 20, 
+          y: groundY - h, 
+          w: 20, 
+          h: h, 
+          green: isGreen 
+        }});
       }}
 
       function update(){{
         if(!alive) return;
+
+        // player physics
         player.vy += gravity;
         player.y += player.vy;
         if(player.y + player.h >= groundY){{
           player.y = groundY - player.h;
           player.vy = 0;
           player.grounded = true;
-        }} else {{ player.grounded = false; }}
+        }} else {{
+          player.grounded = false;
+        }}
 
+        // obstacles
         for(let i = obstacles.length-1; i>=0; --i){{
           const ob = obstacles[i];
           ob.x -= speed;
 
-          if(ob.type === 'red'){{
-            if(rectIntersect(player.x, player.y, player.w, player.h, ob.x, ob.y, ob.w, ob.h)) alive = false;
-            else if(ob.x + ob.w < player.x && !ob.counted) {{ redPassed += 1; ob.counted = true; }}
-          }} else if(ob.type === 'green'){{
-            if(rectIntersect(player.x, player.y, player.w, player.h, ob.x, ob.y, ob.w, ob.h) && !ob.counted) {{
-              greenScore += 1;
-              ob.counted = true;
-            }}
-            if(ob.x + ob.w < player.x && !ob.counted) alive = false;
+          if(ob.x + ob.w < -50){{
+            // Red block jumped over
+            if(!ob.green) redScore++;
+            obstacles.splice(i,1);
           }}
-
-          if(ob.x + ob.w < -50) obstacles.splice(i,1);
         }}
 
+        // spawn
         spawnTimer += 1;
         const spawnInterval = Math.max(40, 120 - difficulty*20);
         if(spawnTimer > spawnInterval){{
@@ -110,7 +124,24 @@ HTML = f'''
           spawnObstacle();
         }}
 
-        document.getElementById('score').innerText = 'Green Cube Score: ' + greenScore + ' | Red Cubes Passed: ' + redPassed;
+        // collision check
+        for(let i = obstacles.length-1; i>=0; --i){{
+          const ob = obstacles[i];
+          if(rectIntersect(player.x, player.y, player.w, player.h, ob.x, ob.y, ob.w, ob.h)){{
+            if(ob.green){{
+              greenScore++;
+              obstacles.splice(i,1); // collect green block
+            }} else {{
+              alive = false; // hit red block = game over
+            }}
+          }}
+        }}
+
+        document.getElementById('score').innerText = 
+          'Green Score: ' + greenScore + ' | Red Score: ' + redScore;
+
+        // gradually increase speed
+        speed += 0.0007;
       }}
 
       function rectIntersect(x1,y1,w1,h1,x2,y2,w2,h2){{
@@ -118,22 +149,27 @@ HTML = f'''
       }}
 
       function draw(){{
+        // background
         ctx.fillStyle = '#f4f7fb';
         ctx.fillRect(0,0,W,H);
 
+        // ground
         ctx.fillStyle = '#e9eef5';
         ctx.fillRect(0, groundY, W, H-groundY);
 
+        // player
         ctx.fillStyle = '#3b82f6';
         ctx.fillRect(player.x, player.y, player.w, player.h);
         ctx.fillStyle = '#fff';
         ctx.fillRect(player.x + player.w - 10, player.y + 10, 6, 6);
 
+        // obstacles
         for(const ob of obstacles){{
-          ctx.fillStyle = ob.type === 'red' ? '#ef4444' : '#22c55e';
+          ctx.fillStyle = ob.green ? '#22c55e' : '#ef4444'; // green or red
           ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
         }}
 
+        // game over overlay
         if(!alive){{
           ctx.fillStyle = 'rgba(0,0,0,0.5)';
           ctx.fillRect(0,0,W,H);
@@ -141,10 +177,10 @@ HTML = f'''
           ctx.font = '28px Arial';
           ctx.textAlign = 'center';
           ctx.fillText('Game Over', W/2, H/2 - 30);
-          ctx.font = '22px Arial';
-          ctx.fillText('Green Cube Score: ' + greenScore + ' | Red Cubes Passed: ' + redPassed, W/2, H/2);
           ctx.font = '18px Arial';
-          ctx.fillText('Click Restart or press Space to play again', W/2, H/2 + 30);
+          ctx.fillText('Green Score: ' + greenScore, W/2, H/2);
+          ctx.fillText('Red Score: ' + redScore, W/2, H/2 + 30);
+          ctx.fillText('Click Restart or press Space to play again', W/2, H/2 + 60);
         }}
       }}
 
@@ -156,6 +192,7 @@ HTML = f'''
         }}
       }}
 
+      // controls
       window.addEventListener('keydown', (e)=>{{
         if(e.code === 'Space' || e.code === 'ArrowUp'){{
           e.preventDefault();
@@ -179,6 +216,5 @@ HTML = f'''
 </html>
 '''
 
-components.html(HTML, height=height+140, scrolling=True)
+components.html(HTML, height=height+160, scrolling=True)
 
-st.caption("This is a single-file example — edit the HTML/JS inside the Python file to extend features (sound, sprites, powerups, persistent highscore, etc.).")
